@@ -1,7 +1,9 @@
-function Menu() {}
+
+function Menu() {
+}
 
 Menu.prototype.argumentsToList = function (arg) {
-		
+
 		var args = !arg.length ? [arg] : [].slice.call(arg,1);
 		var list = null;
 
@@ -18,27 +20,30 @@ Menu.prototype.argumentsToList = function (arg) {
 }
 
 Menu.prototype.calculatePrice = function () {
-		var price = 0;
-		var list = this[Object.keys(this)[0]];
-		if(Object.keys(this)[1]) list.rest = this[Object.keys(this)[1]];
+	var price = 0;
 
-		for (var el = list; el ; el = el.rest) {
+	for(var i = 0; i < Object.keys(this).length; i++) {
+		for (var el = this[Object.keys(this)[i]]; el ; el = el.rest) {
 			price += el.price;
 		}
+	}
 
 	return price;
 }
 
 Menu.prototype.calculateCalories = function () {
     var cal = 0;
-    var list = this[Object.keys(this)[0]];
-    if(Object.keys(this)[1]) list.rest = this[Object.keys(this)[1]];
 
-  	for (var el = list; el ; el = el.rest) {
-    	cal += el.cal;
-  	}
-
+    for(var i = 0; i < Object.keys(this).length; i++) {
+		for (var el = this[Object.keys(this)[i]]; el ; el = el.rest) {
+			cal += el.cal;
+		}
+	}
   return cal;
+}
+
+Menu.prototype.getType = function() {
+	return this.constructor.name + ' ' + (this.size || this.type).name;
 }
 
 function Hamburger(size, stuffing) {
@@ -77,12 +82,9 @@ Object.defineProperties(Hamburger, {
 	}
 })
 
-Hamburger.prototype.getSize = function() {
-	return this.size.name;
-}
 
 Hamburger.prototype.getStuffing = function() {
-	var stuffing = {};
+	var stuffing = Object.create(null);
 	for(var el = this.stuffing; el; el = el.rest) {
 		if(!stuffing[el.name]) stuffing[el.name] = 0;
 		stuffing[el.name]++;
@@ -90,14 +92,26 @@ Hamburger.prototype.getStuffing = function() {
 	return stuffing;
 }
 
-function Salad(type) {
-	this.type = this.argumentsToList(type);
+function Salad(type, weight) {
+	this.type = this.weightCount(this.argumentsToList(type) , weight);
+	Object.defineProperty(this, 'weight', {
+		value: weight
+	});
 }
 
 Salad.prototype = Object.create(Menu.prototype);
 Salad.prototype.constructor = Salad;
 
 Object.defineProperties(Salad, {
+	'SIZE_STANDART': {
+		value: 100,
+		enumerable: true
+	},
+
+	'SIZE_LARGE': {
+		value: 200,
+		enumerable: true
+	},
 	'TYPE_CAESAR': {
 		value: {name: 'caesar', price: 100, cal: 20},
 		enumerable: true
@@ -109,8 +123,17 @@ Object.defineProperties(Salad, {
 	}
 })
 
-Salad.prototype.getType = function() {
-	return this.type.name;
+Salad.prototype.getWeight = function() {
+	return this.weight;
+}
+
+Salad.prototype.weightCount = function (obj, weight) {
+	for(var i = 0; i < Object.keys(obj).length; i++) {
+		if(!isNaN(obj[Object.keys(obj)[i]]) && typeof obj[Object.keys(obj)[i]] === 'number') {
+			obj[Object.keys(obj)[i]] *= weight/100; 
+		};
+	};
+	return obj;
 }
 
 function Drink(type) {
@@ -132,99 +155,66 @@ Object.defineProperties(Drink, {
 	}
 })
 
-Drink.prototype.getType = function() {
-	return this.type.name;
-}
+function Order() {}
 
-function Order() {
-	function createInstance(cls) {
-		return new (Function.prototype.bind.apply(cls, arguments));
-	}
+Order.prototype.getMenuItemOptions = function itemProp(cls) {
+		var itemPar = Object.create(null);
 
-	function itemProp(cls) {
-		var itemPar = {};
-		if(!itemPar[cls.name]) itemPar[cls.name] = {};
+		if(!itemPar[cls.name]) itemPar[cls.name] = Object.create(null);
+
 		for(var i = 0; i < Object.keys(cls).length; i++) {
 			itemPar[cls.name][Object.keys(cls)[i]] = cls[Object.keys(cls)[i]];
 		};
-		return (function() {
-			return itemPar[cls.name];
-		}()); 
-	}
 
-	var _count = {};
-
-	Object.defineProperty(this, 'getCount', {
-		get: function() {
-			return _count;
-		}
-	});
-
-	Object.defineProperty(this, 'countDown', {
-		set: function(cls) {
-			_count[cls.name]--;
-		}
-	});
-
-	Object.defineProperty(this, 'addOrderPosition', {
-		value: function(cls, param) {
-			if(Object.isFrozen(this)) return;
-			if(!this[cls.name]) {
-				this[cls.name] = null;
-			}
-
-			var element = {
-				value: createInstance.apply(cls, Array.prototype.slice.call(arguments))
-			};
-			element.next = this[cls.name];
-			this[cls.name] = element;
-			
-			if(!_count[cls.name]) _count[cls.name] = 0;
-			_count[cls.name]++;
-		},
-	});
-
-	Object.defineProperty(this, 'getMenuItemOptions', {
-		value: itemProp,
-	})
+		return itemPar[cls.name]; 
 }
 
-Order.prototype.removePosition = function(cls, param) {
-	if(!this.getCount[cls.name] || this.getCount[cls.name] === 0) {
-		return;
-	}
-
-	var searchItem = new (Function.prototype.bind.apply(cls, arguments));
-
-	if(deepEqual(this[cls.name].value, searchItem)) {
-		this[cls.name] = this[cls.name].next;
-		this.countDown = cls;
-		return;
-	}
-
-	function deepEqual(a, b) {
-		if (a === b) return true;
-		if (a == null || typeof a != "object" ||
-			b == null || typeof b != "object") return false;
-		var keysA = Object.keys(a), keysB = Object.keys(b);
-		if (keysA.length != keysB.length) return false;
-		for (var i = 0; i < keysA.length; i++) {
-		if (!keysB.includes(keysA[i]) || !deepEqual(a[keysA[i]], b[keysA[i]])) return false;
-		}
-		return true;
-	}
-
-	var previous = this[cls.name];
-	var current = previous.next;
+Order.prototype.addOrderPosition = function(cls, param) {
+	if(Object.isFrozen(this)) return;
 	
-	for(var el = current; el; el.next) {
-		if(deepEqual(current.value, searchItem)) {
-			previous.next = current.next;
-			return;
-		}
-		previous = current;
-		current = current.next;
-    }
+	var item = new (cls.bind.apply(cls, arguments));
+
+	if(item.constructor.name === 'Error') return item;
+
+	if(!this.items) {
+		this.items = [];
+	}
+
+	this.items.push(item);
+}
+
+Order.prototype.getItems = function() {
+	var output = function(obj, i) {
+
+		var type = obj.getType(),
+			calories = obj.calculateCalories(),
+			price = obj.calculatePrice();
+
+		if(obj.constructor.name === 'Hamburger') {
+			return console.log('Order position: ' + (i+1), 'Type: ' + type,
+			obj.getStuffing(), 'Calories: ' + calories, 'Price: ' + price);
+		};
+
+		if(obj.constructor.name === 'Salad') {
+			return console.log('Order position: ' + (i+1), 'Type: ' + type,
+			'Weight: ' + obj.getWeight(), 'Calories: ' + calories, 'Price: ' + price);
+		};
+
+		if(obj.constructor.name === 'Drink') {
+			return console.log('Order position: ' + (i+1), 'Type: ' + type,
+			'Calories: ' + calories, 'Price: ' + price);
+		};
+	}
+
+	for(var i = 0; i < this.items.length; i++) {
+		output(this.items[i], i);
+	}
+
+}
+
+Order.prototype.removePosition = function(index) {
+	if(Object.isFrozen(this)) return;
+	this.items.splice(index - 1, 1)
 }
 
 Order.prototype.calculatePrice = function() {
@@ -232,10 +222,9 @@ Order.prototype.calculatePrice = function() {
 		value: 0,
 		writable: true
 	});
-	for(var i = 0; i < Object.keys(this).length; i++) {
-		for(var j = this[Object.keys(this)[i]]; j; j = j.next) {
-			this.price += j.value.calculatePrice();
-		}
+
+	for(var i = 0; i < this.items.length; i++) {
+		this.price += this.items[i].calculatePrice();
 	}
 	return this.price;
 }
@@ -245,11 +234,11 @@ Order.prototype.calculateCalories = function() {
 		value: 0,
 		writable: true
 	});
-	for(var i = 0; i < Object.keys(this).length; i++) {
-		for(var j = this[Object.keys(this)[i]]; j; j = j.next) {
-			this.cal += j.value.calculateCalories();
+
+	for(var i = 0; i < this.items.length; i++) {
+		this.cal += this.items[i].calculateCalories();
 		}
-	}
+
 	return this.cal;
 }
 
